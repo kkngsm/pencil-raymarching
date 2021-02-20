@@ -2,13 +2,15 @@ function addGUI(){
     // GUIパラメータ
     let guiCtrl = function(){
         //this.resolution = 1;
-        this.binarization = 0.94;
+        this.PI = -1.3745189813843364;
+        this.zoom = 1.;
     };
 
     gui = new dat.GUI();
     guiObj = new guiCtrl();
     //gui.add( guiObj, 'resolution', {'x0.5': 0.5, 'x1': 1}).onChange(onWindowResize());
-    gui.add(guiObj, 'binarization', 0., 1.);
+    gui.add(guiObj, 'PI', -3.1415, 3.1415);
+    gui.add(guiObj, 'zoom', -0.1, 5.);
     gui.open();
     
     function onWindowResize() {

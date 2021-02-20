@@ -70,7 +70,9 @@ window.onload = function(){
         mousePress : gl.getUniformLocation(backprg, 'mousePress'),
         time       : gl.getUniformLocation(backprg, 'time'),
         tex        : gl.getUniformLocation(backprg, 'tex'),
-        previous        : gl.getUniformLocation(backprg, 'previous'),
+        previous   : gl.getUniformLocation(backprg, 'previous'),
+        PI   : gl.getUniformLocation(backprg, 'PI'),
+        zoom   : gl.getUniformLocation(backprg, 'zoom'),
     };
     const saveprgUL = {
         previous    : gl.getUniformLocation(saveprg, 'previous'),
@@ -104,6 +106,8 @@ window.onload = function(){
         setUniformTexture(backprgUL['tex'], 0, texture);
         //uniform sampler2D previous;
         setUniformTexture(backprgUL['previous'], 1, saveFrameBuffer.t);
+        gl.uniform1f(backprgUL['PI'], guiParam.PI);
+        gl.uniform1f(backprgUL['zoom'], guiParam.zoom);
         //頂点の描画 gpuの起動
         gl.drawElements(gl.TRIANGLES, indices.length , gl.UNSIGNED_SHORT, 0);
         
