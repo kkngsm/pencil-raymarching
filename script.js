@@ -4,7 +4,7 @@ const CANVAS_SIZE_Y = window.innerHeight;
 //マウス座標
 let mouseX = 0,mouseY = 0; omouseX = 0, omouseY = 0, mousePress = 0;
 let fps = 1000 /30;
-
+let wheel = 0;
 window.onload = function(){
     // canvasエレメントを取得
     const c = document.getElementById('canvas');
@@ -15,6 +15,7 @@ window.onload = function(){
     c.addEventListener('mousemove', {width: c.width, height: c.height, handleEvent: mouseMove}, true);
     c.addEventListener('mousedown', function(){mousePress = 1}, true);
     c.addEventListener('mouseup', function(){mousePress = 0}, true);
+    c.addEventListener('wheel', function(e){wheel += e.deltaY; wheel = Math.min(Math.max(wheel, -15), 0.)}, true);
 
     // webgl2コンテキストを取得
     gl = c.getContext('webgl2');
@@ -107,7 +108,7 @@ window.onload = function(){
         //uniform sampler2D previous;
         setUniformTexture(backprgUL['previous'], 1, saveFrameBuffer.t);
         gl.uniform1f(backprgUL['PI'], guiParam.PI);
-        gl.uniform1f(backprgUL['zoom'], guiParam.zoom);
+        gl.uniform1f(backprgUL['zoom'], wheel);
         //頂点の描画 gpuの起動
         gl.drawElements(gl.TRIANGLES, indices.length , gl.UNSIGNED_SHORT, 0);
         

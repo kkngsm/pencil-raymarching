@@ -18,7 +18,7 @@
             }
         </script>
         <script id="fs" type="fragment-shader">#version 300 es
-            #define MAX_MARCH 64
+            #define MAX_MARCH 128
             #define MAX_DIST 100.
             precision highp float;
             in vec2 fragCoord;
@@ -34,20 +34,72 @@
             uniform float PI;
             uniform float zoom;
 
-            float dist_func(vec3 p){
-                float n = 1.1;
-                p = mod(p, n*2.)-n;
-                return length(p)-0.5;
+            struct Intersect{
+                float dist;
+                vec3 col;
+            };
+            float sdHex(vec3 p, vec2 h, float r) {
+                vec3 q = abs(p);
+                vec2 temp;
+                temp.x = max(q.x*1.732050*0.5 + q.z * 0.5, q.z);
+                temp.y = q.y;
+                return length(max(temp - h, 0.0)) - r;
             }
+
+            float sdCone( vec3 p, vec2 c )
+            {
+                // c is the sin/cos of the angle
+                vec2 q = vec2( length(p.xz), -p.y );
+                float d = length(q-c*max(dot(q,c), 0.0));
+                return d * ((q.x*c.y-q.y*c.x<0.0)?-1.0:1.0);
+            }
+            
+            Intersect sdPencil(vec3 p, float h){
+                float cdist, hdist, close;
+                vec3 cP = p - vec3(0,h,0);
+                cdist = sdCone( cP, vec2(0.25881904510252,0.96592582628907))- 0.05;
+                float lead = step(0.5, cP.y+ 1.);
+
+                hdist = sdHex(p, vec2(0.5, 5.), 0.01);
+                close = step(cdist, hdist);
+                Intersect i;
+                i.col = (1.-max(close, lead))*vec3(0.87, 0.72, 0.53) + max(close, lead)*vec3(0.9,0,0);
+                i.dist = max(cdist, hdist);
+                return i;
+            }
+
+            Intersect hexTiling(vec3 p){
+                vec2 rep = vec2(1.7320508*2., 2.)*2.;
+                vec3 p1 = p,
+                    p2 = p;
+                vec2 p1ID, p2ID;
+                p1ID = floor(p.xz/rep)- rep*0.5;
+                p1.xz = mod(p.xz, rep) - rep*0.5;
+                p2ID = floor((p.xz+ rep*0.5)/rep)- rep*0.5;
+                p2.xz = mod(p.xz + rep*0.5, rep) - rep*0.5;
+                Intersect p1i, p2i, i;
+                p1i = sdPencil(p1, sin(length(p1ID)+time)*2.);
+                p2i = sdPencil(p2, sin(length(p2ID)+time)*2.);
+
+                i.dist =  min(p1i.dist, p2i.dist);
+                float close = step(p1i.dist, p2i.dist);
+                i.col = close*p1i.col + (1.-close)*p2i.col;
+                return i;
+            }
+            Intersect dist_func(vec3 p){
+
+                return hexTiling(p);
+            }
+
             vec3 get_n(vec3 p){
                 float ep = 0.0001;
                 vec3 epx = vec3(ep, 0., 0.);
                 vec3 epy = vec3(0., ep, 0.);
                 vec3 epz = vec3(0., 0., ep);
                 return normalize(vec3(
-                    dist_func(p+epx)-dist_func(p-epx),
-                    dist_func(p+epy)-dist_func(p-epy),
-                    dist_func(p+epz)-dist_func(p-epz)
+                    dist_func(p+epx).dist-dist_func(p-epx).dist,
+                    dist_func(p+epy).dist-dist_func(p-epy).dist,
+                    dist_func(p+epz).dist-dist_func(p-epz).dist
                 ));
             }
             vec2 norCoord(vec2 coord){
@@ -55,43 +107,44 @@
                 return temp*resolution/min(resolution.x,resolution.y);
             }
             void main() {
-                float t = time*0.1;
+                float t = time;
                 vec2 uv = norCoord(fragCoord);
-                vec3 ro = vec3(sin(t)*3., 2., cos(t)*3.);
+                vec3 ro = vec3(0, 6., 6.);
 
                 vec3 lightdir = vec3(1.);
-                vec3 lookat = vec3(0.);
-                //float zoom = 1.;
+                vec3 lookat = vec3(0);
+                float z = 1. - zoom * 0.1;
                 
                 vec3 f = normalize(lookat-ro);
                 vec3 vertical = normalize(cross(vec3(0,1,0), f));
                 vec3 horizontal = cross(f, vertical);
-                vec3 i = ro + f*zoom + uv.x * vertical + uv.y * horizontal;
+                vec3 i = ro + f*z + uv.x * vertical + uv.y * horizontal;
                 vec3 rdir = normalize(i -ro);
 
                 vec3 ray = ro;
-                vec3 col = vec3(0.);
-                float dist = 0., d = 0.;
+                vec3 col = vec3(1.);
+                float dist = 0.;
+                Intersect data;
                 int march;
                 for(march = 0; march < MAX_MARCH; march++){
-                    d = dist_func(ray);
-                    dist += d;
+                    data = dist_func(ray);
+                    dist += data.dist;
                     ray = ro + rdir*dist;
-                    if(abs(d) < 0.001)break;
+                    if(abs(data.dist) < 0.001)break;
                     if(dist>MAX_DIST) {
                         dist = MAX_DIST;
                         march = MAX_MARCH-1;
                         break;
                     }
                 }
-                if(abs(d) < 0.001){
+                if(abs(data.dist) < 0.001){
                     vec3 n = get_n(ray);
-                    float c = dot(lightdir, n)*0.3+0.2;
-                    col = vec3(c);
+                    float c = dot(-rdir, n)*0.5+0.5;
+                    col = data.col*c;
                 }
                 float fog = min(1.0, (1.0 / float(MAX_MARCH)) * float(march))*1.0;
-                vec3  fog2 = 0.01 * vec3(1, 2, 1) * dist;
-                col += vec3(0.1, 0.2, 0.1)*fog + fog2;
+                vec3  fog2 = vec3(0.01) * dist;
+                col += vec3(0.1)*fog + fog2;
 
                 fragColor.xyz = col;
                 fragColor.w = 1.;
