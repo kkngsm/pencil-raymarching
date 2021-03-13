@@ -31,9 +31,11 @@
             uniform float time;
             uniform sampler2D previous;
             uniform sampler2D tex;
-            uniform float PI;
+
+            uniform float light_power;
             uniform float zoom;
 
+            #define PI 3.141592653589
             struct Intersect{
                 float dist;
                 vec3 col;
@@ -139,10 +141,16 @@
                 }
                 if(abs(data.dist) < 0.001){
                     vec3 n = get_n(ray);
-                    float c = dot(-rdir, n)*0.5+0.5;
-                    col = data.col*c;
+                    float c = light_power*dot(-rdir, n)/PI + 0.2;
+                    float norm_factor    = ( light_power + 2. ) / ( 2. * PI );
+                    float specular = pow( max( dot( reflect(lightdir, n), rdir ), 0.), light_power )* norm_factor;
+                    col = data.col*(c + specular);
                 }
-                float fog = min(1.0, (1.0 / float(MAX_MARCH)) * float(march))*1.0;
+
+                float closeness = float(march) / float(MAX_MARCH);
+                float AO = 1.-closeness;
+                col *= AO;
+                float fog = min(1.0, closeness)*1.0;
                 vec3  fog2 = vec3(0.01) * dist;
                 col += vec3(0.1)*fog + fog2;
 
