@@ -40,6 +40,14 @@
                 float dist;
                 vec3 col;
             };
+            // SDF Reference source
+            // https://www.iquilezles.org/www/articles/distfunctions/distfunctions.htm
+            
+            float sdPlane( vec3 p, vec3 n, float h ){
+                // n must be normalized
+                return dot(p,n) + h;
+            }
+
             float sdHex(vec3 p, vec2 h, float r) {
                 vec3 q = abs(p);
                 vec2 temp;
@@ -80,12 +88,16 @@
                 p2ID = floor((p.xz+ rep*0.5)/rep)- rep*0.5;
                 p2.xz = mod(p.xz + rep*0.5, rep) - rep*0.5;
                 Intersect p1i, p2i, i;
-                p1i = sdPencil(p1, sin(length(p1ID)+time)*2.);
-                p2i = sdPencil(p2, sin(length(p2ID)+time)*2.);
+                p1i = sdPencil(p1, sin(length(p1ID+time))*2.);
+                p2i = sdPencil(p2, sin(length(p2ID+time))*2.);
 
-                i.dist =  min(p1i.dist, p2i.dist);
-                float close = step(p1i.dist, p2i.dist);
-                i.col = close*p1i.col + (1.-close)*p2i.col;
+                float d = sdPlane(p, vec3(0,1,0), 20.);
+                float pd = min(p1i.dist, p2i.dist);
+                i.dist =  min(pd, d);
+                float pencil_close = step(p1i.dist, p2i.dist);
+                float plane_close = step(pd, d);
+                
+                i.col = mix(vec3(1), mix(p2i.col, p1i.col, pencil_close), plane_close);
                 return i;
             }
             Intersect dist_func(vec3 p){
@@ -141,7 +153,7 @@
                 }
                 if(abs(data.dist) < 0.001){
                     vec3 n = get_n(ray);
-                    float c = light_power*dot(-rdir, n)/PI + 0.2;
+                    float c = light_power*dot(-rdir, n)/PI + 0.4;
                     float norm_factor    = ( light_power + 2. ) / ( 2. * PI );
                     float specular = pow( max( dot( reflect(lightdir, n), rdir ), 0.), light_power )* norm_factor;
                     col = data.col*(c + specular);
@@ -152,7 +164,7 @@
                 col *= AO;
                 float fog = min(1.0, closeness)*1.0;
                 vec3  fog2 = vec3(0.01) * dist;
-                col += vec3(0.1)*fog + fog2;
+                col -= vec3(0.1)*fog + fog2;
 
                 fragColor.xyz = col;
                 fragColor.w = 1.;
